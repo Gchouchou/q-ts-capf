@@ -45,7 +45,7 @@ Calls DEFAULT if there are no matches."
 ;; override q-capf--bounds with treesitter version
 (advice-add 'q-capf--bounds :around 'q-ts-capf--bounds)
 
-(defun q-ts-table-col-capf ()
+(defun q-ts-capf-table-col-capf ()
   "Completion at point for table column names."
   (when (and (hash-table-p q-capf-session-vars)
              ;; do not trigger inside comments and strings
@@ -85,29 +85,26 @@ Calls DEFAULT if there are no matches."
                                       "^\\(select\\|exec\\|delete\\|update\\|by\\|from\\|where\\)$"
                                       ;; type works on exact matches
                                       (treesit-node-text node)))))
-                (keyword (pop keyword-children))
-                (status 'init))
-      (while (and (eq status 'init) keyword-children)
-        (let ((next-word (pop keyword-children)))
-          (setq status (cond
-                        ;; catch special case between from and where
-                        ((string= "where" (treesit-node-type next-word))
-                         (< (treesit-node-end next-word) (point)))
-                        ((< (treesit-node-end keyword) (point) (treesit-node-start next-word)) t)
-                        ((< (point) (treesit-node-end keyword)) 'invalid)
-                        (t 'init)))))
-      ;; only succeed when inbetween is t
-      (when (eq status t)
+                (command (when (string-match-p "^\\(select\\|exec\\|delete\\|update\\)$"
+                                               (treesit-node-text (car keyword-children)))
+                           (pop keyword-children)))
+                (from (progn (while (and keyword-children
+                                         (not (string= "from" (treesit-node-text (car keyword-children)))))
+                               (pop keyword-children))
+                             (when keyword-children (pop keyword-children)))))
+      ;; only succeed when point is between end of command and start of from
+      (when (or (< (treesit-node-end command) (point) (treesit-node-start from))
+                ;; or when it is after the "where" command
+                (when (and keyword-children (string= "where" (treesit-node-text (car keyword-children))))
+                  (< (treesit-node-end (car keyword-children)) (point))))
         (let ((bounds (q-capf--bounds)))
           (list
            (car bounds)
            (cdr bounds)
-           columns
+           (append columns nil)
            :exclusive 'no
            :annotation-function
-           (lambda (col) " table column")
-           )))
-      )))
+           (lambda (col) " table column")))))))
 
 (provide 'q-ts-capf)
 ;;; q-ts-capf.el ends here
