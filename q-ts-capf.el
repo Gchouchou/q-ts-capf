@@ -45,6 +45,7 @@ Calls DEFAULT if there are no matches."
 ;; override q-capf--bounds with treesitter version
 (advice-add 'q-capf--bounds :around 'q-ts-capf--bounds)
 
+;;;###autoload
 (defun q-ts-capf-table-col-capf ()
   "Completion at point for table column names."
   (when (and (hash-table-p q-capf-session-vars)
