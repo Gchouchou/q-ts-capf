@@ -14,6 +14,10 @@
 (require 'q-capf)
 (require 'q-ts-mode)
 
+(defvar q-ts-capf--columns
+  ()
+  "Cache of columns.")
+
 (defun q-ts-capf--bounds (&optional default)
   "Return bounds of token in q grammar.
 Calls DEFAULT if there are no matches."
@@ -98,6 +102,7 @@ Calls DEFAULT if there are no matches."
                 ;; or when it is after the "where" command
                 (when (and keyword-children (string= "where" (treesit-node-text (car keyword-children))))
                   (< (treesit-node-end (car keyword-children)) (point))))
+        (setq q-ts-capf--columns (append columns nil))
         (let ((bounds (q-capf--bounds)))
           (list
            (car bounds)
@@ -106,6 +111,41 @@ Calls DEFAULT if there are no matches."
            :exclusive 'no
            :annotation-function
            (lambda (col) " table column")))))))
+
+(defun q-ts-capf-super-capf ()
+  "Wrap `q-ts-capf-table-col-capf' and `q-capf-completion-at-point'."
+  (let* ((col-capf (q-ts-capf-table-col-capf))
+         (capf (q-capf-completion-at-point)))
+    (cond
+     ;; both present and same begin and end
+     ((and col-capf capf (eq (car col-capf) (car capf))
+           (eq (cadr col-capf) (cadr capf)))
+      (let* ((begin (car capf))
+             (end (cadr capf))
+             (col-candidates (caddr col-capf))
+             (capf-candidates (caddr capf))
+             (col-plist (cdddr col-capf))
+             (capf-plist (cdddr capf)))
+        (list
+         begin
+         end
+         (append col-candidates capf-candidates)
+         :exclusive 'no
+         :annotation-function
+         (lambda (candidate)
+            (if (member candidate q-ts-capf--columns)
+                " table column"
+              (q-capf--capf-annotation candidate)))
+         :company-doc-buffer
+         (lambda (candidate)
+            (unless (member candidate q-ts-capf--columns)
+                (q-capf--capf-doc-buffer candidate)))
+         )))
+     ;; uneven bounds
+     ((and col-capf capf)
+      col-capf)
+     ;; one present or all missing
+     (t (or col-capf capf)))))
 
 (provide 'q-ts-capf)
 ;;; q-ts-capf.el ends here
