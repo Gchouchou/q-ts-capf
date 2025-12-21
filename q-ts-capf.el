@@ -112,6 +112,7 @@ Calls DEFAULT if there are no matches."
            :annotation-function
            (lambda (col) " table column")))))))
 
+;;;###autoload
 (defun q-ts-capf-super-capf ()
   "Wrap `q-ts-capf-table-col-capf' and `q-capf-completion-at-point'."
   (let* ((col-capf (q-ts-capf-table-col-capf))
