@@ -103,7 +103,7 @@ Calls DEFAULT if there are no matches."
                 (when (and keyword-children (string= "where" (treesit-node-text (car keyword-children))))
                   (< (treesit-node-end (car keyword-children)) (point))))
         (setq q-ts-capf--columns (append columns nil))
-        (let ((bounds (q-capf--bounds)))
+        (let ((bounds (q-ts-capf--bounds)))
           (list
            (car bounds)
            (cdr bounds)
@@ -171,27 +171,23 @@ Returns ((start . end) . index), where index is used for function parameters."
                    (if-let*
                        ((parameter_pass (treesit-node-parent
                                          (treesit-node-at (+ 1 (point)))))
+                        (func_node (treesit-node-child-by-field-name
+                                    (treesit-node-parent parameter_pass)
+                                    "function"))
                         (n (length
                             (treesit-filter-child
                              parameter_pass
                              (lambda (child)
                                (and (string= "semicolon" (treesit-node-type child))
-                                    (<= (treesit-node-end child) pos))))))
-                        (bounds (progn
-                                  ;; goto function definition, end-1
-                                  (goto-char
-                                   (- (treesit-node-end
-                                       (treesit-node-child-by-field-name
-                                        (treesit-node-parent parameter_pass)
-                                        "function"))
-                                      1))
-                                  (q-ts-capf--bounds))))
-                       (cons bounds n)
+                                    (<= (treesit-node-end child) pos)))))))
+                       (cons (progn ;; goto function definition, end-1
+                               (goto-char (- (treesit-node-end func_node) 1))
+                               (q-ts-capf--bounds)) n)
                      (cons bounds -1))))
              (scan-error nil))))))
    (when default (funcall default))))
 
-;;; override q-capf--bounds with treesitter version
+;;; override q-capf-eldoc-get-bounds with treesitter version
 (advice-add 'q-capf-eldoc-get-bounds :around 'q-ts-capf-eldoc-get-bounds)
 
 (provide 'q-ts-capf)
