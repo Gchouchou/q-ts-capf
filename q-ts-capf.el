@@ -139,8 +139,7 @@ Calls DEFAULT if there are no matches."
          :company-doc-buffer
          (lambda (candidate)
             (unless (member candidate q-ts-capf--columns)
-                (q-capf--capf-doc-buffer candidate)))
-         )))
+                (q-capf--capf-doc-buffer candidate))))))
      ;; uneven bounds
      ((and col-capf capf)
       col-capf)
