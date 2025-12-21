@@ -18,33 +18,39 @@
   ()
   "Cache of columns.")
 
+(defvar q-ts-capf--params
+  ()
+  "Cache of param names.")
+
 (defun q-ts-capf--bounds (&optional default)
   "Return bounds of token in q grammar.
 Calls DEFAULT if there are no matches."
-  (let* ((node (treesit-node-at (point) 'q))
-         (parent (when node (treesit-node-parent node))))
-    (cond
-     ((and node (string-match-p
-                 (eval-when-compile
-                   (format
-                    "^%s$"
-                    (regexp-opt
-                     (list "builtin_infix_func" "assignment_func"
-                           "number" "temporal" "symbol" "invalid_atom"
-                           "command" "byte_list"))))
-                 (treesit-node-type node))
-           (<= (treesit-node-start node) (point) (treesit-node-end node)))
-      (cons (treesit-node-start node) (treesit-node-end node)))
-     ((and parent (string-match-p
+  (save-excursion
+    (skip-syntax-backward "w") ;; FIXME very nasty hack with default
+    (let* ((node (treesit-node-at (point) 'q))
+           (parent (when node (treesit-node-parent node))))
+      (cond
+       ((and node (string-match-p
                    (eval-when-compile
                      (format
                       "^%s$"
                       (regexp-opt
-                       (list "variable" "char" "string"))))
-                   (treesit-node-type parent))
-           (<= (treesit-node-start parent) (point) (treesit-node-end parent)))
-      (cons (treesit-node-start parent) (treesit-node-end parent)))
-     (t (if default (funcall default) (cons (point) (point)))))))
+                       (list "builtin_infix_func" "assignment_func"
+                             "number" "temporal" "symbol" "invalid_atom"
+                             "command" "byte_list"))))
+                   (treesit-node-type node))
+             (<= (treesit-node-start node) (point) (treesit-node-end node)))
+        (cons (treesit-node-start node) (treesit-node-end node)))
+       ((and parent (string-match-p
+                     (eval-when-compile
+                       (format
+                        "^%s$"
+                        (regexp-opt
+                         (list "variable" "char" "string"))))
+                     (treesit-node-type parent))
+             (<= (treesit-node-start parent) (point) (treesit-node-end parent)))
+        (cons (treesit-node-start parent) (treesit-node-end parent)))
+       (t (if default (funcall default) (cons (point) (point))))))))
 
 ;; override q-capf--bounds with treesitter version
 (advice-add 'q-capf--bounds :around 'q-ts-capf--bounds)
@@ -52,6 +58,7 @@ Calls DEFAULT if there are no matches."
 ;;;###autoload
 (defun q-ts-capf-table-col-capf ()
   "Completion at point for table column names."
+  (setq q-ts-capf--columns nil)
   (when (and (hash-table-p q-capf-session-vars)
              ;; do not trigger inside comments and strings
              (not (nth 3 (syntax-ppss)))
@@ -112,40 +119,73 @@ Calls DEFAULT if there are no matches."
            :annotation-function
            (lambda (col) " table column")))))))
 
+(defun q-ts-capf-local-variable ()
+  "Completion at point for function local variables."
+  ;; do not trigger inside comments and strings
+  (setq q-ts-capf--params nil)
+  (when (and (not (nth 3 (syntax-ppss)))
+             (not (nth 4 (syntax-ppss))))
+    (when-let* ((bounds (q-ts-capf--bounds))
+                ;; find the first ancestor func_definition
+                (func_def (treesit-parent-until
+                           (treesit-node-at (car bounds))
+                           (lambda (node)
+                             (string= "func_definition" (treesit-node-type node)))
+                           t))
+                (candidates
+                 (if-let* ((param_node (treesit-node-child-by-field-name func_def "parameters")))
+                     (let* ((params (treesit-filter-child
+                                     param_node
+                                     (lambda (node)
+                                       (not (string= "semicolon" (treesit-node-type node))))
+                                     'named)))
+                       (if (> (length params) 0)
+                           (mapcar (lambda (param)
+                                     (let* ((text (treesit-node-text param)))
+                                       (set-text-properties 0 (length text) nil text)
+                                       text))
+                                   params)
+                         nil))
+                   ;; default parameter names
+                   '("x" "y" "z"))))
+      (setq q-ts-capf--params candidates)
+      (list
+       (car bounds)
+       (cdr bounds)
+       candidates
+       :exclusive 'no
+       :annotation-function
+       (lambda (cand) " local function parameter")))))
+
 ;;;###autoload
 (defun q-ts-capf-super-capf ()
-  "Wrap `q-ts-capf-table-col-capf' and `q-capf-completion-at-point'."
-  (let* ((col-capf (q-ts-capf-table-col-capf))
-         (capf (q-capf-completion-at-point)))
-    (cond
-     ;; both present and same begin and end
-     ((and col-capf capf (eq (car col-capf) (car capf))
-           (eq (cadr col-capf) (cadr capf)))
-      (let* ((begin (car capf))
-             (end (cadr capf))
-             (col-candidates (caddr col-capf))
-             (capf-candidates (caddr capf))
-             (col-plist (cdddr col-capf))
-             (capf-plist (cdddr capf)))
+  "Wrap all q-capfs.
+`q-ts-capf-table-col-capf', `q-capf-completion-at-point' and `q-ts-capf-local-variable'."
+  (let* ((bounds (q-ts-capf--bounds)))
+    ;; if there is a period before only capf is valid
+    (if (when (char-before (car bounds))
+          (or (char-equal ?. (char-before (car bounds)))
+              (char-equal ?. (char-before (1+ (car bounds))))))
+        (q-capf-completion-at-point)
+      (let* ((col-capf (q-ts-capf-table-col-capf))
+             (param-capf (q-ts-capf-local-variable))
+             (capf (q-capf-completion-at-point)))
         (list
-         begin
-         end
-         (append col-candidates capf-candidates)
+         (car bounds)
+         (cdr bounds)
+         (append q-ts-capf--columns q-ts-capf--params (when capf (caddr capf)))
          :exclusive 'no
          :annotation-function
          (lambda (candidate)
-            (if (member candidate q-ts-capf--columns)
-                " table column"
-              (q-capf--capf-annotation candidate)))
+           (cond
+            ((member candidate q-ts-capf--columns) " table column")
+            ((member candidate q-ts-capf--params) " local function parameter")
+            (t (q-capf--capf-annotation candidate))))
          :company-doc-buffer
          (lambda (candidate)
-            (unless (member candidate q-ts-capf--columns)
-                (q-capf--capf-doc-buffer candidate))))))
-     ;; uneven bounds
-     ((and col-capf capf)
-      col-capf)
-     ;; one present or all missing
-     (t (or col-capf capf)))))
+           (unless (or (member candidate q-ts-capf--columns)
+                       (member candidate q-ts-capf--params))
+             (q-capf--capf-doc-buffer candidate))))))))
 
 (defun q-ts-capf-eldoc-get-bounds (&optional default)
   "Around Function for DEFAULT `q-capf-eldoc-get-bounds'.
