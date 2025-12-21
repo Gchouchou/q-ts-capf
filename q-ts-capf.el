@@ -146,5 +146,52 @@ Calls DEFAULT if there are no matches."
      ;; one present or all missing
      (t (or col-capf capf)))))
 
+(defun q-ts-capf-eldoc-get-bounds (&optional default)
+  "Around Function for DEFAULT `q-capf-eldoc-get-bounds'.
+Used by `q-capf-eldoc' to get the bounds of q variable/function.
+Leverage treesitter to accurately get bounds.
+Returns ((start . end) . index), where index is used for function parameters."
+  (or
+   (save-excursion
+     (let* ((bounds (q-ts-capf--bounds))
+            (pos (point)))
+       (cond
+        ((or (bobp) (not (eq (car bounds) (cdr bounds)))) (cons bounds -1))
+        ((progn (skip-chars-backward " \t")
+                (eq ?w (char-syntax (char-before))))
+         ;; possibly the first argument of the function
+         (goto-char (- (point) 1))
+         (cons (q-ts-capf--bounds) 0))
+        ;; try to find parameter pass
+        (t (condition-case nil
+               (progn
+                 (backward-up-list)
+                 (when (eq ?\[ (char-after))
+                   (if-let*
+                       ((parameter_pass (treesit-node-parent
+                                         (treesit-node-at (+ 1 (point)))))
+                        (n (length
+                            (treesit-filter-child
+                             parameter_pass
+                             (lambda (child)
+                               (and (string= "semicolon" (treesit-node-type child))
+                                    (<= (treesit-node-end child) pos))))))
+                        (bounds (progn
+                                  ;; goto function definition, end-1
+                                  (goto-char
+                                   (- (treesit-node-end
+                                       (treesit-node-child-by-field-name
+                                        (treesit-node-parent parameter_pass)
+                                        "function"))
+                                      1))
+                                  (q-ts-capf--bounds))))
+                       (cons bounds n)
+                     (cons bounds -1))))
+             (scan-error nil))))))
+   (when default (funcall default))))
+
+;;; override q-capf--bounds with treesitter version
+(advice-add 'q-capf-eldoc-get-bounds :around 'q-ts-capf-eldoc-get-bounds)
+
 (provide 'q-ts-capf)
 ;;; q-ts-capf.el ends here
