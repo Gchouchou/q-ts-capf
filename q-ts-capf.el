@@ -119,6 +119,7 @@ Calls DEFAULT if there are no matches."
            :annotation-function
            (lambda (col) " table column")))))))
 
+;;;###autoload
 (defun q-ts-capf-local-variable ()
   "Completion at point for function local variables."
   ;; do not trigger inside comments and strings
