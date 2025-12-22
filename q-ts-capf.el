@@ -138,7 +138,7 @@ Calls DEFAULT if there are no matches."
                      (let* ((params (treesit-filter-child
                                      param_node
                                      (lambda (node)
-                                       (not (string= "semicolon" (treesit-node-type node))))
+                                       (string= "variable" (treesit-node-type node)))
                                      'named)))
                        (if (> (length params) 0)
                            (mapcar (lambda (param)
