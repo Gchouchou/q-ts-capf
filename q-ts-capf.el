@@ -163,31 +163,35 @@ Calls DEFAULT if there are no matches."
 (defun q-ts-capf-super-capf ()
   "Wrap all q-capfs.
 `q-ts-capf-table-col-capf', `q-capf-completion-at-point' and `q-ts-capf-local-variable'."
-  (let* ((bounds (q-ts-capf--bounds)))
-    ;; if there is a period before only capf is valid
-    (if (when (char-before (car bounds))
-          (or (char-equal ?. (char-before (car bounds)))
-              (char-equal ?. (char-before (1+ (car bounds))))))
-        (q-capf-completion-at-point)
-      (let* ((col-capf (q-ts-capf-table-col-capf))
-             (param-capf (q-ts-capf-local-variable))
-             (capf (q-capf-completion-at-point)))
-        (list
-         (car bounds)
-         (cdr bounds)
-         (append q-ts-capf--columns q-ts-capf--params (when capf (caddr capf)))
-         :exclusive 'no
-         :annotation-function
-         (lambda (candidate)
-           (cond
-            ((member candidate q-ts-capf--columns) " table column")
-            ((member candidate q-ts-capf--params) " local function parameter")
-            (t (q-capf--capf-annotation candidate))))
-         :company-doc-buffer
-         (lambda (candidate)
-           (unless (or (member candidate q-ts-capf--columns)
-                       (member candidate q-ts-capf--params))
-             (q-capf--capf-doc-buffer candidate))))))))
+  (when (and (not (nth 3 (syntax-ppss)))
+             (not (nth 4 (syntax-ppss))))
+    (let* ((bounds (q-ts-capf--bounds))
+           (begin (car bounds))
+           (end (cdr bounds)))
+      ;; if there is a period before only capf is valid
+      (if (when (char-before begin)
+            (or (char-equal ?. (char-before begin))
+                (char-equal ?. (char-before (1+ begin)))))
+          (q-capf-completion-at-point)
+        (let* ((col-capf (q-ts-capf-table-col-capf))
+               (param-capf (q-ts-capf-local-variable))
+               (capf (q-capf-completion-at-point)))
+          (list
+           bounds
+           end
+           (append q-ts-capf--columns q-ts-capf--params (when capf (caddr capf)))
+           :exclusive 'no
+           :annotation-function
+           (lambda (candidate)
+             (cond
+              ((member candidate q-ts-capf--columns) " table column")
+              ((member candidate q-ts-capf--params) " local function parameter")
+              (t (q-capf--capf-annotation candidate))))
+           :company-doc-buffer
+           (lambda (candidate)
+             (unless (or (member candidate q-ts-capf--columns)
+                         (member candidate q-ts-capf--params))
+               (q-capf--capf-doc-buffer candidate)))))))))
 
 (defun q-ts-capf-eldoc-get-bounds (&optional default)
   "Around Function for DEFAULT `q-capf-eldoc-get-bounds'.
