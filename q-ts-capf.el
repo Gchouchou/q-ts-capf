@@ -25,32 +25,33 @@
 (defun q-ts-capf--bounds (&optional default)
   "Return bounds of token in q grammar.
 Calls DEFAULT if there are no matches."
-  (save-excursion
-    (skip-syntax-backward "w") ;; FIXME very nasty hack with default
-    (let* ((node (treesit-node-at (point) 'q))
-           (parent (when node (treesit-node-parent node))))
-      (cond
-       ((and node (string-match-p
-                   (eval-when-compile
-                     (format
-                      "^%s$"
-                      (regexp-opt
-                       (list "builtin_infix_func" "assignment_func"
-                             "number" "temporal" "symbol" "invalid_atom"
-                             "command" "byte_list"))))
-                   (treesit-node-type node))
-             (<= (treesit-node-start node) (point) (treesit-node-end node)))
-        (cons (treesit-node-start node) (treesit-node-end node)))
-       ((and parent (string-match-p
-                     (eval-when-compile
-                       (format
-                        "^%s$"
-                        (regexp-opt
-                         (list "variable" "char" "string"))))
-                     (treesit-node-type parent))
-             (<= (treesit-node-start parent) (point) (treesit-node-end parent)))
-        (cons (treesit-node-start parent) (treesit-node-end parent)))
-       (t (if default (funcall default) (cons (point) (point))))))))
+  (or (save-excursion
+        (skip-syntax-backward "w")
+        (let* ((node (treesit-node-at (point) 'q))
+               (parent (when node (treesit-node-parent node))))
+          (cond
+           ((and node (string-match-p
+                       (eval-when-compile
+                         (format
+                          "^%s$"
+                          (regexp-opt
+                           (list "builtin_infix_func" "assignment_func"
+                                 "number" "temporal" "symbol" "invalid_atom"
+                                 "command" "byte_list"))))
+                       (treesit-node-type node))
+                 (<= (treesit-node-start node) (point) (treesit-node-end node)))
+            (cons (treesit-node-start node) (treesit-node-end node)))
+           ((and parent (string-match-p
+                         (eval-when-compile
+                           (format
+                            "^%s$"
+                            (regexp-opt
+                             (list "variable" "char" "string"))))
+                         (treesit-node-type parent))
+                 (<= (treesit-node-start parent) (point) (treesit-node-end parent)))
+            (cons (treesit-node-start parent) (treesit-node-end parent))))))
+      (when default (funcall default))
+      (cons (point) (point))))
 
 ;; override q-capf--bounds with treesitter version
 (advice-add 'q-capf--bounds :around 'q-ts-capf--bounds)
