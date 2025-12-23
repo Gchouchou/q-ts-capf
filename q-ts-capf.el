@@ -177,7 +177,7 @@ Calls DEFAULT if there are no matches."
                (param-capf (q-ts-capf-local-variable))
                (capf (q-capf-completion-at-point)))
           (list
-           bounds
+           begin
            end
            (append q-ts-capf--columns q-ts-capf--params (when capf (caddr capf)))
            :exclusive 'no
