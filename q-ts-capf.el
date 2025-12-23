@@ -210,7 +210,7 @@ Returns ((start . end) . index), where index is used for function parameters."
         ((progn (skip-chars-backward " \t")
                 (eq ?w (char-syntax (char-before))))
          ;; possibly the first argument of the function
-         (goto-char (- (point) 1))
+         (goto-char (1- (point)))
          (cons (q-ts-capf--bounds) 0))
         ;; try to find parameter pass
         (t (condition-case nil
@@ -219,7 +219,7 @@ Returns ((start . end) . index), where index is used for function parameters."
                  (when (eq ?\[ (char-after))
                    (if-let*
                        ((parameter_pass (treesit-node-parent
-                                         (treesit-node-at (+ 1 (point)))))
+                                         (treesit-node-at (1+ (point)))))
                         (func_node (treesit-node-child-by-field-name
                                     (treesit-node-parent parameter_pass)
                                     "function"))
@@ -230,8 +230,9 @@ Returns ((start . end) . index), where index is used for function parameters."
                                (and (string= "semicolon" (treesit-node-type child))
                                     (<= (treesit-node-end child) pos)))))))
                        (cons (progn ;; goto function definition, end-1
-                               (goto-char (- (treesit-node-end func_node) 1))
-                               (q-ts-capf--bounds)) n)
+                               (goto-char (1- (treesit-node-end func_node)))
+                               (q-ts-capf--bounds))
+                             n)
                      (cons bounds -1))))
              (scan-error nil))))))
    (when default (funcall default))))
