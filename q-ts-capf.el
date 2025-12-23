@@ -162,7 +162,8 @@ Calls DEFAULT if there are no matches."
 ;;;###autoload
 (defun q-ts-capf-super-capf ()
   "Wrap all q-capfs.
-`q-ts-capf-table-col-capf', `q-capf-completion-at-point' and `q-ts-capf-local-variable'."
+Combines `q-ts-capf-table-col-capf', `q-capf-completion-at-point'
+and `q-ts-capf-local-variable'."
   (when (and (not (nth 3 (syntax-ppss)))
              (not (nth 4 (syntax-ppss))))
     (let* ((bounds (q-ts-capf--bounds))
@@ -175,11 +176,13 @@ Calls DEFAULT if there are no matches."
           (q-capf-completion-at-point)
         (let* ((col-capf (q-ts-capf-table-col-capf))
                (param-capf (q-ts-capf-local-variable))
-               (capf (q-capf-completion-at-point)))
+               (capf (q-capf-completion-at-point))
+               (candidates (when capf (caddr capf))))
+          (setq q-ts-capf--params (seq-difference q-ts-capf--params candidates))
           (list
            begin
            end
-           (append q-ts-capf--columns q-ts-capf--params (when capf (caddr capf)))
+           (append q-ts-capf--columns q-ts-capf--params candidates)
            :exclusive 'no
            :annotation-function
            (lambda (candidate)
