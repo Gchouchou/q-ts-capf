@@ -64,52 +64,47 @@ Calls DEFAULT if there are no matches."
              ;; do not trigger inside comments and strings
              (not (nth 3 (syntax-ppss)))
              (not (nth 4 (syntax-ppss))))
-    ;; we need to make sure we have a sql expression
-    (when-let* ((node (treesit-node-at
-                       (save-excursion
-                         ;; while it is space or tab
-                         (while (or (eq (char-before) 32) (eq (char-before) 10))
-                           (backward-char))
-                         (backward-char)
-                         (point))
-                       'q))
+    (when-let* ((node (save-excursion
+                        (while (or (eq (char-before) ? ) (eq (char-before) ?\t))
+                          (backward-char))
+                        (unless (or (bobp) (eq (char-before) ?\n)) (backward-char))
+                        (let* ((n (treesit-node-at (point) 'q)))
+                          ;; match where and , ERROR nodes due to incomplete SQL statements
+                          (if (and (string-match-p "^\\(where\\|,\\)$" (treesit-node-text n))
+                                   (string= "ERROR" (treesit-node-type (treesit-node-parent n))))
+                              (progn
+                                (goto-char (treesit-node-start n))
+                                (while (or (eq (char-before) ? ) (eq (char-before) ?\t))
+                                  (backward-char))
+                                (unless (or (bobp) (eq (char-before) ?\n)) (backward-char))
+                                (treesit-node-at (point) 'q))
+                            n))))
                 (sql_exp (treesit-parent-until
                           node
                           (lambda (node)
-                            ;; this could be an error when not valid
-                            (string-match-p "\\(sql_expression\\|comment\\|string\\)"
+                            ;; func_definition creates a new closure
+                            (string-match-p "\\(sql_expression\\|func_definition\\)"
                                      (treesit-node-type node)))
                           t))
                 (table-node (when (string= "sql_expression" (treesit-node-type sql_exp))
                                 (treesit-node-child-by-field-name sql_exp "table")))
-                ;; only continue if table is a variable
-                (table (and (string= "variable" (treesit-node-type table-node))
-                            (treesit-node-text table-node)))
+                (table (when (string= "variable" (treesit-node-type table-node))
+                         (treesit-node-text table-node)))
                 ;; double check we have documentation and more than 1 column for table
                 (element (treesit-node-text (treesit-node-child-by-field-name table-node "element")))
                 (namespace (substring table 0 (- (length table) (length element))))
                 (doc (q-capf-get-doc element namespace))
                 (columns (gethash "cols" doc))
-                ;; get the nodes/positions of all keywords
-                (keyword-children (treesit-filter-child
-                                   sql_exp
-                                   (lambda (node)
-                                     (string-match-p
-                                      "^\\(select\\|exec\\|delete\\|update\\|by\\|from\\|where\\)$"
-                                      ;; type works on exact matches
-                                      (treesit-node-text node)))))
+                (sql-children (treesit-node-children sql_exp))
                 (command (when (string-match-p "^\\(select\\|exec\\|delete\\|update\\)$"
-                                               (treesit-node-text (car keyword-children)))
-                           (pop keyword-children)))
-                (from (progn (while (and keyword-children
-                                         (not (string= "from" (treesit-node-text (car keyword-children)))))
-                               (pop keyword-children))
-                             (when keyword-children (pop keyword-children)))))
-      ;; only succeed when point is between end of command and start of from
+                                               (treesit-node-text (car sql-children)))
+                           (pop sql-children)))
+                (from (let* ((front (pop sql-children)))
+                        (while (and front (not (string= "from" (treesit-node-text front))))
+                          (setq front (pop sql-children)))
+                        front)))
       (when (or (< (treesit-node-end command) (point) (treesit-node-start from))
-                ;; or when it is after the "where" command
-                (when (and keyword-children (string= "where" (treesit-node-text (car keyword-children))))
-                  (< (treesit-node-end (car keyword-children)) (point))))
+                (< (treesit-node-end table-node) (point)))
         (setq q-ts-capf--columns (append columns nil))
         (let ((bounds (q-ts-capf--bounds)))
           (list
