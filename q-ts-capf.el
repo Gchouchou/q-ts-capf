@@ -168,8 +168,8 @@ and `q-ts-capf-local-variable'."
            (begin (car bounds))
            (end (cdr bounds)))
       ;; if there is a period before only capf is valid
-      (if (when (char-before (1+ begin))
-            (char-equal ?. (char-before (1+ begin))))
+      (if (when (char-after begin)
+            (char-equal ?. (char-after begin)))
           (q-capf-completion-at-point)
         (let* ((col-capf (q-ts-capf-table-col-capf))
                (param-capf (q-ts-capf-local-variable))
