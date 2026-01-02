@@ -216,7 +216,7 @@ Returns ((start . end) . index), where index is used for function parameters."
                  (when (eq ?\[ (char-after))
                    (if-let*
                        ((parameter_pass (treesit-node-parent
-                                         (treesit-node-at (1+ (point)))))
+                                         (treesit-node-at (point))))
                         (func_node (treesit-node-child-by-field-name
                                     (treesit-node-parent parameter_pass)
                                     "function"))
