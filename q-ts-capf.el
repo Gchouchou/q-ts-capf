@@ -59,6 +59,7 @@ Calls DEFAULT if there are no matches."
 ;;;###autoload
 (defun q-ts-capf-table-col-capf ()
   "Completion at point for table column names."
+  (interactive)
   (setq q-ts-capf--columns nil)
   (when (and (hash-table-p q-capf-session-vars)
              ;; do not trigger inside comments and strings
@@ -118,6 +119,7 @@ Calls DEFAULT if there are no matches."
 ;;;###autoload
 (defun q-ts-capf-local-variable ()
   "Completion at point for function local variables."
+  (interactive)
   ;; do not trigger inside comments and strings
   (setq q-ts-capf--params nil)
   (when (and (not (nth 3 (syntax-ppss)))
@@ -159,6 +161,7 @@ Calls DEFAULT if there are no matches."
   "Wrap all q-capfs.
 Combines `q-ts-capf-table-col-capf', `q-capf-completion-at-point'
 and `q-ts-capf-local-variable'."
+  (interactive)
   (when (and (not (nth 3 (syntax-ppss)))
              (not (nth 4 (syntax-ppss))))
     (let* ((bounds (q-ts-capf--bounds))
