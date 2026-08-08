@@ -82,10 +82,7 @@ Calls DEFAULT if there are no matches."
                             n))))
                 (sql_exp (treesit-parent-until
                           node
-                          (lambda (node)
-                            ;; func_definition creates a new closure
-                            (string-match-p "\\(sql_expression\\|func_definition\\)"
-                                     (treesit-node-type node)))
+                          "\\(sql_expression\\|func_definition\\)"
                           t))
                 (table-node (when (string= "sql_expression" (treesit-node-type sql_exp))
                                 (treesit-node-child-by-field-name sql_exp "table")))
@@ -128,8 +125,7 @@ Calls DEFAULT if there are no matches."
                 ;; find the first ancestor func_definition
                 (func_def (treesit-parent-until
                            (treesit-node-at (car bounds))
-                           (lambda (node)
-                             (string= "func_definition" (treesit-node-type node)))
+                           "func_defintion"
                            t))
                 (candidates
                  (if-let* ((param_node (treesit-node-child-by-field-name func_def "parameters")))
